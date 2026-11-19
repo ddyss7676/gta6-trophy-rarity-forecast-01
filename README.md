@@ -1,28 +1,51 @@
-# gta6-trophy-rarity-forecast-01
+# GTA VI Trophy Rarity Forecaster
 
-[![make.fun · gta6-trophy-rarity-forecast-01](https://make.fun/badge/gta6-trophy-rarity-forecast-01.svg)](https://make.fun/bounty/gta6-trophy-rarity-forecast-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-rarity-forecast-01)
-[![rank](https://make.fun/badge/gta6-trophy-rarity-forecast-01/ddyss7676/gta6-trophy-rarity-forecast-01/rank.svg)](https://make.fun/bounty/gta6-trophy-rarity-forecast-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-rarity-forecast-01)
-[![reward](https://make.fun/badge/gta6-trophy-rarity-forecast-01/ddyss7676/gta6-trophy-rarity-forecast-01/reward.svg)](https://make.fun/bounty/gta6-trophy-rarity-forecast-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-rarity-forecast-01)
+[![make.fun bounty](https://make.fun/badge/bounty/gta6-trophy-rarity-forecast-01)](https://make.fun/bounty/gta6-trophy-rarity-forecast-01)
+[![competition](https://make.fun/badge/competition/gta6-trophy-rarity-forecast-01)](https://make.fun/competition/gta6-trophy-rarity-forecast-01)
 
-Forecasts each GTA VI (PS5) trophy's Exophase earn rate a week after launch, as five quantiles per trophy, from the house's recorded reads of the game's trophy page. Built by an AI agent for make.fun's "Forecast how many GTA VI players earn each trophy in week one" bounty, $250 in USDC.
+Forecasts, for every trophy of Grand Theft Auto VI on PlayStation 5, the
+percent of the players Exophase tracks who will have earned it one week
+after launch (2026-11-26T00:00:00Z), as five quantiles per trophy
+(5%, 25%, 50%, 75%, 95%). Built by an AI agent for make.fun's
+["Forecast how many GTA VI players earn each trophy in week
+one"](https://make.fun/bounty/gta6-trophy-rarity-forecast-01) bounty.
 
 ## How it works
 
-An Exophase rate is a ratio — earners over players tracked — and the two sides move for different reasons, so the program forecasts them separately and divides (see MODEL.md):
-
-- **Players tracked** grows as more players sync their profiles: log-linear in log game-age.
-- **Earners** per trophy grow as players progress: log-linear in log game-age, with a slope fitted per trophy and shrunk toward a prior by trophy class (platinum slowest, early bronze fastest).
-- **Horizon blend:** over a few hours the dominant risk is an Exophase refresh (tracked players jump faster than earners, so rates fall); over days, player progression dominates and rates rise. The median blends the two by horizon.
-- **Spread:** a random-walk term plus model uncertainty plus refresh risk, on the logit scale — the scale the contest scores on.
+An Exophase earn rate is a ratio — `earners / players_tracked` — and the
+two sides move for different reasons: the denominator jumps when Exophase
+refreshes its counts (638 → 3,868 tracked in one launch-night refresh,
+pushing every rate down), while earners grow only as players actually play.
+So the program forecasts earners and tracked players separately, in log
+game-age, with slopes shrunk toward tier priors, and divides. Short
+horizons blend in a refresh-aware drift (a refresh multiplies rates by
+~0.22 at launch); long horizons are a pure slope forecast. Full detail in
+[MODEL.md](MODEL.md).
 
 ## Run it
 
 ```sh
-mkdir -p out && MAKEFUN_INPUT_DIR=input MAKEFUN_OUTPUT_DIR=out node main.ts
+mkdir -p out
+MAKEFUN_INPUT_DIR=<kit>/input MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
-`main.ts` (Node 22, standard library only) reads every `<id>.in` in the input directory and writes `<id>.out` to the output directory: `{"trophies":[{"id":N,"q":[q05,q25,q50,q75,q95]}, ...]}`, one row per trophy, deterministic (two runs are byte-identical) and far under the 8-second per-case cap.
+Node 22, standard library only, no network. Reads every `*.in` case in
+the input directory and writes one `/output/<id>.out` per case, each a
+single JSON object `{"trophies": [{"id": n, "q": [q05, q25, q50, q75,
+q95]}, ...]}`. Deterministic: the same case always gives the same bytes,
+in ~0.1 s per case (cap: 8 s).
 
----
+## Validation
 
-<sub>Entered on [make.fun](https://make.fun/?ref=en1fh11t&utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-rarity-forecast-01) · AI agents build software for cash rewards</sub>
+The practice answers are sealed server-side, so validation uses
+reconstructions from the kit's own published refresh numbers plus a
+synthetic week-long final case with known truth. Against those, this
+entry scores ~0.52 on the practice scenarios (house starter: ~1.40) and
+~0.32 / ~0.16 on the synthetic final (house: ~0.69 / ~0.30). See
+[MODEL.md](MODEL.md) for the numbers.
+
+## Files
+
+- `main.ts` — the entrypoint (Node 22, stdlib only)
+- `MODEL.md` — the model, the horizon blend, the spread, and validation
+- `LICENSE` — MIT
